@@ -35,37 +35,46 @@ def check_pyinstaller():
 def build():
     check_pyinstaller()
 
-    # 当前目录下的资源文件
     root = os.path.dirname(os.path.abspath(__file__))
     icon_path = os.path.join(root, "favicon.png")
 
-    # PyInstaller 命令参数
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--name", APP_NAME,
-        "--windowed",          # macOS GUI 模式，不显示终端
-        "--onedir",            # 单目录 .app（比 onefile 启动更快）
+        "--windowed",
+        "--onedir",
         "--osx-bundle-identifier", BUNDLE_ID,
-        # 添加数据文件: src:dst
-        "--add-data", f"{os.path.join(root, 'index.html')}:",
-        "--add-data", f"{os.path.join(root, 'favicon.png')}:",
-        # 隐藏导入（volcengine SDK 是可选的，如果已安装则包含）
-        "--hidden-import", "volcengine.ApiInfo",
-        "--hidden-import", "volcengine.Credentials",
-        "--hidden-import", "volcengine.ServiceInfo",
-        "--hidden-import", "volcengine.auth.SignerV4",
-        "--hidden-import", "volcengine.base.Service",
+        # 添加数据文件: src:dst（dst 用 . 表示根目录）
+        "--add-data", f"{os.path.join(root, 'index.html')}:{'.'}",
+        "--add-data", f"{os.path.join(root, 'favicon.png')}:{'.'}",
         # 清理旧构建
         "--noconfirm",
         # 入口脚本
         os.path.join(root, "app.py"),
     ]
 
-    # 如果存在图标，使用图标
+    # 如果安装了 volcengine SDK，添加 hidden imports
+    try:
+        import volcengine  # noqa: F401
+        cmd.extend([
+            "--hidden-import", "volcengine.ApiInfo",
+            "--hidden-import", "volcengine.Credentials",
+            "--hidden-import", "volcengine.ServiceInfo",
+            "--hidden-import", "volcengine.auth.SignerV4",
+            "--hidden-import", "volcengine.base.Service",
+        ])
+        print("[INFO] 检测到 volcengine SDK，已添加相关 hidden imports")
+    except ImportError:
+        print("[INFO] 未安装 volcengine SDK，跳过相关 hidden imports")
+
+    # 转换图标
     if os.path.exists(icon_path):
-        # PyInstaller macOS 支持 .icns，这里用 PNG 需要借助其他工具转换
-        # 暂时不设置图标，后续可以用 iconutil / sips 转换
-        pass
+        try:
+            icns_path = convert_png_to_icns(icon_path, root)
+            cmd.extend(["--icon", icns_path])
+            print(f"[INFO] 使用图标: {icns_path}")
+        except Exception as e:
+            print(f"[WARN] 图标转换失败: {e}")
 
     print("=" * 50)
     print(f"正在打包 {APP_NAME} v{APP_VERSION}...")
@@ -87,7 +96,7 @@ def build():
 
 
 def convert_png_to_icns(png_path, output_dir):
-    """将 PNG 转换为 macOS .icns 图标（可选）"""
+    """将 PNG 转换为 macOS .icns 图标"""
     import tempfile
     import shutil
 
