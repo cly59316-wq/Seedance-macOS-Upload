@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,12 +21,25 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pyinstaller
-          # 可选：安装 volcengine SDK（如果需要 Assets API 功能）
-          # pip install volcengine
+          pip install --upgrade setuptools wheel
 
       - name: Build macOS app
         run: |
-          python3 build_macos.py
+          python3 -m PyInstaller \
+            --name "Seedance" \
+            --windowed \
+            --onedir \
+            --osx-bundle-identifier "cn.seedance.app" \
+            --add-data "index.html:." \
+            --add-data "favicon.png:." \
+            --noconfirm \
+            --clean \
+            app.py
+
+      - name: Verify build output
+        run: |
+          ls -la dist/
+          ls -la "dist/Seedance.app/Contents/MacOS/" || true
 
       - name: Zip .app for distribution
         run: |
